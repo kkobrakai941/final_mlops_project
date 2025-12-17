@@ -4,10 +4,8 @@ import pandas as pd
 import numpy as np
 import psycopg2
 
-# API endpoint for the ML service running in docker-compose
 API_URL = "http://ml_service:8000"
 
-# Database connection configuration (matches docker-compose)
 DB_HOST = "db"
 DB_PORT = 5432
 DB_NAME = "postgres"
