@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: mlops_user
+      POSTGRES_PASSWORD: mlops_pass
+      POSTGRES_DB: mlops_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+
+  message_broker:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+
+  ml_service:
+    build:
+      context: ./ml_service
+    depends_on:
+      - db
+      - message_broker
+    environment:
+      DATABASE_URL: postgresql://mlops_user:mlops_pass@db:5432/mlops_db
+      BROKER_URL: amqp://guest:guest@message_broker:5672/
+    ports:
+      - "8000:8000"
+
+  ui:
+    build:
+      context: ./ui
+    depends_on:
+      - ml_service
+      - db
+    environment:
+      API_URL: http://ml_service:8000
+      DATABASE_URL: postgresql://mlops_user:mlops_pass@db:5432/mlops_db
+    ports:
+      - "8501:8501"
+
+  scheduler:
+    image: apache/airflow:2.7.0
+    depends_on:
+      - db
+      - message_broker
+    environment:
+      AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+      AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://mlops_user:mlops_pass@db:5432/airflow
+      AIRFLOW__CELERY__BROKER_URL: amqp://guest:guest@message_broker:5672//
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://mlops_user:mlops_pass@db:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+    volumes:
+      - ./scheduler/dags:/opt/airflow/dags
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "airflow db upgrade &&
+               airflow users create --username admin --password admin --firstname admin --lastname admin --role Admin --email admin@example.com &&
+               airflow scheduler & airflow webserver"
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - ml_service
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
+volumes:
+  db_data:
+  grafana_data:
