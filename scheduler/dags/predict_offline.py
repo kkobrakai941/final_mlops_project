@@ -3,10 +3,13 @@ Airflow DAG that periodically generates random Iris dataset samples and
 sends them to the inference API endpoint. This simulates offline batch
 prediction jobs and allows monitoring of end-to-end system health.
 """
+
 from datetime import datetime, timedelta
 import json
-import requests
-import numpy as np
+import random
+import urllib.request
+import urllib.error
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
@@ -22,27 +25,27 @@ default_args = {
     "retry_delay": timedelta(minutes=5),
 }
 
-
 def generate_and_predict(**context):
     """Generate random Iris-like features and send to the ML service for prediction."""
     # Iris feature ranges based on the dataset (approximate)
-    sepal_length = np.random.uniform(4.0, 7.5)
-    sepal_width = np.random.uniform(2.0, 4.5)
-    petal_length = np.random.uniform(1.0, 6.5)
-    petal_width = np.random.uniform(0.1, 2.5)
+    sepal_length = random.uniform(4.0, 7.5)
+    sepal_width = random.uniform(2.0, 4.5)
+    petal_length = random.uniform(1.0, 6.5)
+    petal_width = random.uniform(0.1, 2.5)
     payload = {
         "features": [sepal_length, sepal_width, petal_length, petal_width]
     }
     try:
-        response = requests.post(API_URL, json=payload, timeout=10)
-        response.raise_for_status()
-        result = response.json()
+        # Prepare data for HTTP POST
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(API_URL, data=data, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode())
         # Log the prediction result to Airflow task log
         print(f"Sent features {payload['features']}, received prediction: {result}")
-    except Exception as e:
+    except urllib.error.URLError as e:
         print(f"Error sending prediction request: {e}")
         raise
-
 
 # Define the DAG
 with DAG(
