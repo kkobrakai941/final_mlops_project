@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS predictions (
+    id SERIAL PRIMARY KEY,
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    features JSONB NOT NULL,
+    prediction INTEGER NOT NULL
+);
