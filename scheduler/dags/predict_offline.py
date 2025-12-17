@@ -14,8 +14,6 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 
 API_URL = "http://ml_service:8000/predict"
-
-# Default arguments for the DAG
 default_args = {
     "owner": "airflow",
     "depends_on_past": False,
@@ -27,7 +25,7 @@ default_args = {
 
 def generate_and_predict(**context):
     """Generate random Iris-like features and send to the ML service for prediction."""
-    # Iris feature ranges based on the dataset (approximate)
+   
     sepal_length = random.uniform(4.0, 7.5)
     sepal_width = random.uniform(2.0, 4.5)
     petal_length = random.uniform(1.0, 6.5)
